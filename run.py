@@ -1,7 +1,10 @@
-import os, re, time
+import os
+import re
+import time
 import requests
 # import Threading
-import sys, json
+import sys
+import json
 import base64
 import hashlib
 from rich.progress import track
@@ -9,27 +12,42 @@ from Crypto.Cipher import AES
 from concurrent.futures import ThreadPoolExecutor, wait, FIRST_COMPLETED, as_completed
 iv = b'8yeywyJ45esysW8M'
 # https://api.laomaoxs.com/novel/txt/novel/lists?order=0&status=0&sex=1&page=0&type=4
-# def encrypt(text, key):
-# aes_key = hashlib.sha256(key.encode('utf-8')).digest()
-# aes_key = AES.new(aes_key, AES.MODE_CFB, iv)
-# return base64.b64encode(aes.encrypt(text))
+
+
+help = {'info': """输入首字母
+h | help\t\t\t\t\t\t--- 显示说明
+q | quit\t\t\t\t\t\t--- 退出正在运作的程序
+c | cookie\t\t\t\t\t\t--- 检测本地的cookie凭证
+d | d + bookid\t\t\t\t\t\t--- 下载指定小说章节文本
+u | u + url\t\t\t\t\t\t--- 下载指定小说章节文本
+n | n + bookname\t\t\t\t\t--- 输入书名下载小说文本
+t | t + tagname\t\t\t\t\t\t--- 下载全站标签书籍信息"""}
+
+
+def encrypt(text, key):
+    """AES.MODE_CBC加密"""
+    aes_key = hashlib.sha256(key.encode('utf-8')).digest()
+    aes_key = AES.new(aes_key, AES.MODE_CFB, iv)
+    return base64.b64encode(aes.encrypt(text))
 
 
 def decrypt(encrypted, key='b23c159r9t88hl2q'):
+    """AES.MODE_CBC解密"""
     aes_key = hashlib.sha256(key.encode('utf-8')).digest()
     aes = AES.new(key.encode('utf-8'), AES.MODE_CBC, iv)
     return pkcs7un_padding(aes.decrypt(base64.b64decode(encrypted)))
 
 
 def pkcs7un_padding(data):
+    """AES.MODE_CBC解密"""
     length = len(data)
     un_padding = ord(chr(data[length - 1]))
     return data[0:length - un_padding]
 
 
 def example(express, result=None):
-    result = eval(express)
-    return result
+    """转十六进制为字典"""
+    return eval(express)
 
 
 class Download():
@@ -41,7 +59,6 @@ class Download():
         self.charCount = ""
         self.authorName = ""
         self.chapter_list = []
-
         self.os_config_json = os.path.join(os.getcwd(), 'config')
         self.lastUpdateTime = ""
         self.authorName = ""
@@ -57,10 +74,12 @@ class Download():
         }
 
     def filedir(self):
-        meragefiledir = os.path.join('config', self.bookName)  # 获取当前文件夹中的文件名称列表
+        meragefiledir = os.path.join(
+            'config', self.bookName)  # 获取当前文件夹中的文件名称列表
         filenames = os.listdir(meragefiledir)
         filenames.sort(key=lambda x: int(x.split('.')[0]))
-        file = open(os.path.join('Download', f'{self.bookName}.txt'), 'a', encoding='utf-8')
+        file = open(os.path.join(
+            'Download', f'{self.bookName}.txt'), 'a', encoding='utf-8')
         for filename in filenames:  # 先遍历文件名
             filepath = os.path.join(meragefiledir, filename)
             #遍历单个文件，读取行数
@@ -97,7 +116,8 @@ class Download():
 
     def write_txt(self, write_txt_info, number):  # 将信息写入TXT文件
         """删去windowns不规范字符"""
-        self.chapter_list[number-1] = re.sub(r'[？?\*|“<>:/]', '', str(self.chapter_list[number-1]))
+        self.chapter_list[number -
+                          1] = re.sub(r'[？?\*|“<>:/]', '', str(self.chapter_list[number-1]))
         with open(os.path.join('config', self.bookName, f"{number}.{self.chapter_list[number-1]}.txt"), 'w', encoding='utf-8', newline='') as fb:
             fb.write(str(write_txt_info))
 
@@ -105,7 +125,6 @@ class Download():
         # config读取文件名
         read_name = os.listdir(os.path.join('config', self.bookName))
         return read_name
-
 
     def GetBook(self, bookid):
         self.bookid = bookid
@@ -126,42 +145,50 @@ class Download():
         """建立文件夹和文件"""
         self.os_file()
 
-    def chapters(self, Open_ThreadPool=True):
-        number, chapters_list = 0, []
+    def chapters(self, Open_ThreadPool=False):
+        number = 0
+        chapters_list = []
         print('开始下载{} ,一共{}章'.format(self.bookName, len(self.chapter_list)))
-        for i in track(range(len(self.chapter_list))):
-            """书本编号等于bookid÷1000"""
-            num = int(int(self.bookid)/1000)
-            number += 1
-            """跳过已经下载的章节"""
-            if self.chapter_list[number-1]  in ''.join(self.read_config_name()):
-                print(self.chapter_list[number-1], '已经下载过')
-                continue
-            # req = requests.get('https://api.laomaoxs.com/novel/txt/{}/{}/{}.html'.format(
-            #     num, self.bookid, i), headers=self.headers).text
-            if Open_ThreadPool:
-                chapters_list.append('https://api.laomaoxs.com/novel/txt/{}/{}/{}.html'.format(num, self.bookid, i))
-                print(chapters_list)
-                return chapters_list
-            req = requests.get('https://api.laomaoxs.com/novel/txt/{}/{}/{}.html'.format(
-                num, self.bookid, i), headers=self.headers).text
-            content = example(decrypt(req))['data']
-            """跳过屏蔽章节"""
-            if "\\n\\n  编辑正在手打中，稍后点击右上角刷新当前章节！" not in content:
-                print(self.chapter_list[number-1])
-                content_chap_title = ""
-                content_chap_title += f"\n\n\n{self.chapter_list[number-1]}\n\n"
-                for content in content.split("\n"):
-                    content = re.sub(r'^\s*', "\n　　", content)
-                    if re.search(r'\S', content) != None:
-                        content_chap_title += content
-                # time.sleep(0.01)
-                self.write_txt(content_chap_title, number)
-            else:
-                print(f"{self.chapter_list[number-1]}这是屏蔽章节，跳过下载")
-        with open(os.path.join("Download", self.bookName + '.txt'), 'w') as f:
-            self.filedir()
-            print(f'\n小说 {self.bookName} 下载完成')
+        if Open_ThreadPool:
+            for i in track(range(len(self.chapter_list))):
+                number += 1
+                """跳过已经下载的章节"""
+                if self.chapter_list[number-1] in ''.join(self.read_config_name()):
+                    print(self.chapter_list[number-1], '已经下载过')
+                    continue
+                else:
+                    num = int(int(self.bookid)/1000)  # 书本编号等于bookid÷1000
+                    chapters_list.append(
+                        'https://api.laomaoxs.com/novel/txt/{}/{}/{}.html'.format(num, self.bookid, i))
+                    # print(chapters_list[-1])
+            return chapters_list
+        else:
+            for i in track(range(len(self.chapter_list))):
+                """书本编号等于bookid÷1000"""
+                num = int(int(self.bookid)/1000)
+                number += 1
+                """跳过已经下载的章节"""
+                if self.chapter_list[number-1] in ''.join(self.read_config_name()):
+                    print(self.chapter_list[number-1], '已经下载过')
+                    continue
+                req = requests.get('https://api.laomaoxs.com/novel/txt/{}/{}/{}.html'.format(
+                    num, self.bookid, i), headers=self.headers).text
+                content = example(decrypt(req))['data']
+                """跳过屏蔽章节"""
+                if "\\n\\n  编辑正在手打中，稍后点击右上角刷新当前章节！" not in content:
+                    # print(self.chapter_list[number-1])
+                    content_chap_title = ""
+                    content_chap_title += f"\n\n\n{self.chapter_list[number-1]}\n\n"
+                    for content in content.split("\n"):
+                        content = re.sub(r'^\s*', "\n　　", content)
+                        if re.search(r'\S', content) != None:
+                            content_chap_title += content
+                    self.write_txt(content_chap_title, number)
+                else:
+                    print(f"{self.chapter_list[number-1]}这是屏蔽章节，跳过下载")
+            with open(os.path.join("Download", self.bookName + '.txt'), 'w') as f:
+                self.filedir()
+                print(f'\n小说 {self.bookName} 下载完成')
 
     def ThreadPool_download(self, urls, number):
         """多线程下载函数"""
@@ -180,7 +207,6 @@ class Download():
             self.write_txt(content_chap_title, number)
         else:
             print(f"{self.chapter_list[number-1]}这是屏蔽章节，跳过下载")
-
 
     def SearchBook(self, bookname):
         for data in example(decrypt(
@@ -203,39 +229,104 @@ class Download():
                 self.bookName = (data['book_title'])
                 self.bookid = data['book_id']
                 self.GetBook(self.bookid)
-                self.chapters(Open_ThreadPool=False)
+
         # print(type(example(decrypt(tag.text))))
-        
+
     def ThreadPool(self):
-        self.os_meragefiledir()
         with ThreadPoolExecutor(max_workers=4) as t:
-            obj_list, number  = [], 0
-            chapters_list = self.chapters(Open_ThreadPool=True)
-            print(len(chapters_list))
-            for book_url in chapters_list:
+            obj_list, number = [], 0
+            # print(len(self.chapters(Open_ThreadPool=True)))
+            for book_url in self.chapters(Open_ThreadPool=True):
+                # print(book_url)
                 """url          小说完整序号"""
                 """len_number   小说单章号码"""
                 """filenames    小说单章名字"""
                 number += 1
-                filenames = self.read_config_name()
-                # """跳过已经下载的章节"""
-                # if len_number in ''.join(filenames):
-                #     # print(len_number, '已经下载过')
-                #     continue
-                # else:
                 obj = t.submit(self.ThreadPool_download, book_url, number)
                 obj_list.append(obj)
             for future in as_completed(obj_list):
                 data = future.result()
 
-        with open(os.path.join("novel", self.bookName + '.txt'), 'w') as f:
+        with open(os.path.join("Download", self.bookName + '.txt'), 'w') as f:
             self.filedir()
             print(f'\n小说 {self.bookName} 下载完成')
-    
-    # https://api.laomaoxs.com/novel/lists?order=0&status=0&sex=1&page=0&type=4
+
+
+# def Options(self):
+#     try:
+#         Options = sys.argv[1]
+#     except IndexError:
+#         Options = '-h'
+#     return Options
+
+
 if __name__ == '__main__':
-    Tag_Number = 4
     Download = Download()
-    Download.class_list(Tag_Number)
-    # Download.SearchBook("不灭龙帝")
-    Download.chapters(Open_ThreadPool=True)
+    try:
+        Options = sys.argv[1]
+    except IndexError:
+        Options = '-h'
+    try:
+        Options = sys.argv[1]
+    except IndexError:
+        Options = '-h'
+
+    if Options == '-h':
+        print(help['info'])
+
+    if Options == '-q':
+       quit("退出程序")
+
+    elif Options == '-n':
+        try:
+            bookname = sys.argv[2]
+        except IndexError as e:
+            bookname = input(f'Error {e} please input bookname:')
+        try:
+            Open_ThreadPool = sys.argv[3]
+        except IndexError:
+            print('默认以多线程方式下载')
+            Open_ThreadPool = True
+        finally:
+            Download.SearchBook(bookname)
+            if Open_ThreadPool:
+                Download.chapters(True)
+                Download.ThreadPool()
+            else:
+                Download.chapters(False)
+
+    elif Options == '-b':
+        try:
+            bookid = sys.argv[2]
+        except IndexError as e:
+            bookid = input(e, 'input bookid:')
+        try:
+            Open_ThreadPool = sys.argv[3]
+        except IndexError:
+            print('默认以多线程方式下载')
+            Open_ThreadPool = True
+        finally:
+            Download.GetBook(bookid)
+            if Open_ThreadPool:
+                Download.chapters(True)
+                Download.ThreadPool()
+            else:
+                Download.chapters(False)
+
+    elif Options == '-t':
+        try:
+            Tag_Number = sys.argv[2]
+            Open_ThreadPool = sys.argv[3]
+        except IndexError as e:
+            print('Error', e)
+            Tag_Number = input('input Tag Number:')
+            Download.class_list(Tag_Number)
+            Download.chapters(Open_ThreadPool=False)
+        else:
+            Download.class_list(Tag_Number)
+            Download.chapters(Open_ThreadPool)
+    else:
+        print('你输入的选项不存在')
+    # except IndexError as e:
+    #     print("选项为空\n请输入-h获取帮助")
+        # print('选项为空)
