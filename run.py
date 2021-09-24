@@ -29,13 +29,19 @@ def shell():
         except IndexError as e:
             bookname = Download.inputs(f'Error {e} input bookname:')
         try:
-            Open_ThreadPool = sys.argv[3]
+            Open_ThreadPool = bool(sys.argv[3])
         except IndexError:
-            print('默认以多线程方式下载')
             Open_ThreadPool = Read['Open_ThreadPool']
-        finally:
-            Download.SearchBook(bookname, Open_ThreadPool, Read['max_workers_number'])
-
+        search_book = Download.SearchBook(bookname)
+        for i in search_book:
+            Download.GetBook(i)
+            if Open_ThreadPool:
+                print("开启多线程")
+                Download.ThreadPool(Read['max_workers_number'])
+            else:
+                Download.chapters(Open_ThreadPool=False)
+            
+           
     elif Options == '-b':
         try:
             bookid = sys.argv[2]
@@ -49,7 +55,6 @@ def shell():
         finally:
             Download.GetBook(bookid)
             if Open_ThreadPool:
-                Download.chapters(Open_ThreadPool=True)
                 Download.ThreadPool(Read['max_workers_number'])
             else:
                 Download.chapters(Open_ThreadPool=False)
@@ -68,7 +73,6 @@ def shell():
             for i in Download.class_list(Tag_Number):
                 Download.GetBook(i)
                 if Open_ThreadPool:
-                    Download.chapters(Open_ThreadPool=True)
                     Download.ThreadPool(Read['max_workers_number'])
                 else:
                     Download.chapters(Open_ThreadPool=False)
@@ -76,13 +80,9 @@ def shell():
     elif Options == '-max':
         max = sys.argv[2]
         if max.isdigit():
-            max_number = int(max)
-            if max_number > 14:
-                print("输入线程数过大！")
-            else:
-                Read['max_workers_number'] = max_number
-                print("线程已经设置为", max_number)
-                Setting.WriteSettings(Read)
+            Read['max_workers_number'] = 14 if int(max) > 14 else int(max)
+            print("线程已经设置为", Read['max_workers_number'])
+            Setting.WriteSettings(Read)
         else:
             print(max, "不是数字，请重新输入")
     else:
