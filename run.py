@@ -22,8 +22,20 @@ def shell():
     if Options == '-h':
         print(Read['help'])
         quit("退出程序")
+        
+    if Options == '-l':
+        try:
+            username = sys.argv[2]
+        except IndexError as e:
+            username = Download.inputs(f'Error {e} input username:')
+        try:
+            password = sys.argv[2]
+        except IndexError as e:
+            password = Download.inputs(f'Error {e} input password:')
+        search_book = Download.Login(username, password)
+        
 
-    elif Options == '-n':
+    elif Options == '-n' or Options == '--name':
         try:
             bookname = sys.argv[2]
         except IndexError as e:
@@ -42,7 +54,7 @@ def shell():
                 Download.chapters(Open_ThreadPool=False)
             
            
-    elif Options == '-b':
+    elif Options == '-b' or Options == '--bookid':
         try:
             bookid = sys.argv[2]
         except IndexError as e:
@@ -77,10 +89,28 @@ def shell():
                 else:
                     Download.chapters(Open_ThreadPool=False)
                     
+    elif Options == '-r':
+        # try:
+            # Tag_Number = sys.argv[2]
+        # except IndexError as e:
+            # Tag_Number = Download.inputs(f'Error {e} input Tag Number:')
+        try:
+            Open_ThreadPool = sys.argv[3]
+        except IndexError:
+            print('默认以多线程方式下载')
+            Open_ThreadPool = Read['Open_ThreadPool']
+        finally:
+            for i in Download.ranking():
+                Download.GetBook(i)
+                if Open_ThreadPool:
+                    Download.ThreadPool(Read['max_workers_number'])
+                else:
+                    Download.chapters(Open_ThreadPool=False)
+                    
     elif Options == '-max':
         max = sys.argv[2]
         if max.isdigit():
-            Read['max_workers_number'] = 14 if int(max) > 14 else int(max)
+            Read['max_workers_number'] = 12 if int(max) > 12 else int(max)
             print("线程已经设置为", Read['max_workers_number'])
             Setting.WriteSettings(Read)
         else:
