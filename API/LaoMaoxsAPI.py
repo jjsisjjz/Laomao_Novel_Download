@@ -3,7 +3,7 @@ import os, re, sys
 import time, json
 from .AesDecrypt import *
 from rich.progress import track
-from concurrent.futures import ThreadPoolExecutor, wait, FIRST_COMPLETED, as_completed
+from concurrent.futures import ThreadPoolExecutor
 
 
 class Download():
@@ -32,6 +32,19 @@ class Download():
         else:
             return inp
 
+    def post_requests(self, user_name, user_pwd, url):
+        data = {'account': user_name, 'pwd': user_pwd}
+        response = requests.post(url,headers=self.headers, data=data).text
+        return response
+        
+    def get_requests(self, url):
+        response = requests.get(url,headers=self.headers).text
+        return response
+        
+        
+    def exampleDecrypt(self, url):
+        return example(decrypt(self.get_requests(url)))
+        
     def filedir(self):
         meragefiledir = os.path.join(
             'config', self.bookName)  # 获取当前文件夹中的文件名称列表
@@ -87,8 +100,8 @@ class Download():
 
     def GetBook(self, bookid):
         self.bookid = bookid
-        info_book = example(decrypt(requests.get(
-            'https://api.laomaoxs.com/novel/txt/0/{}/index.html'.format(self.bookid), headers=self.headers).text))['data']
+        url = 'https://api.laomaoxs.com/novel/txt/0/{}/index.html'.format(self.bookid)
+        info_book = self.exampleDecrypt(url)['data']
         # print(info_book)
         self.novel_intro = info_book['book_desc']
         self.lastUpdateTime = info_book['update_time']
@@ -125,9 +138,8 @@ class Download():
                 if self.chapter_list[n] in ''.join(self.read_config_name()):
                     print(self.chapter_list[n], '已经下载过')
                     continue
-                req = requests.get('https://api.laomaoxs.com/novel/txt/{}/{}/{}.html'.format(
-                    num, self.bookid, i), headers=self.headers).text
-                content = example(decrypt(req))['data']
+                url = 'https://api.laomaoxs.com/novel/txt/{}/{}/{}.html'.format(num, self.bookid, i)
+                content = self.exampleDecrypt(url)['data']
                 """跳过屏蔽章节"""
                 if "\\n\\n  编辑正在手打中，稍后点击右上角刷新当前章节！" not in content:
                     content_chap_title = ""
@@ -145,8 +157,8 @@ class Download():
 
     def ThreadPool_download(self, urls, number):
         """多线程下载函数"""
-        req = requests.get(urls, headers=self.headers).text
-        content = example(decrypt(req))['data']
+        content = self.exampleDecrypt(urls)['data']
+        # print(content)
         """跳过屏蔽章节"""
         if "\\n\\n  编辑正在手打中，稍后点击右上角刷新当前章节！" not in content:
             book_title = self.chapter_list[number-1]
@@ -164,10 +176,10 @@ class Download():
     def SearchBook(self, bookname):
         search_book = []
         for i in range(100):
-            response = requests.get('https://api.laomaoxs.com/Search/index?key={}&page={}'.format(bookname, i)).text
-            if not example(decrypt(response))['data']:
+            url = f'https://api.laomaoxs.com/Search/index?key={bookname}&page={i}'
+            if not self.exampleDecrypt(url)['data']:
                 break
-            for data in example(decrypt(response))['data']:
+            for data in self.exampleDecrypt(url)['data']:
                 self.bookid = data['book_id']
                 self.book_hits = data['book_hits']  # 排行榜
                 self.bookName = data['book_title']
@@ -179,26 +191,59 @@ class Download():
     def class_list(self, Tag_Number):
         class_list_bookid = []
         for i in range(10000):
-            response = requests.get(f'https://api.laomaoxs.com/novel/lists?order=0&status=0&sex=1&page={i}&type={Tag_Number}', 
-                    headers=self.headers).text
-            if not example(decrypt(response))['data']:
-                return '分类已经下载完毕'
-            for data in example(decrypt(response))['data']:
+            url = f'https://api.laomaoxs.com/novel/lists?order=0&status=0&sex=1&page={i}&type={Tag_Number}'
+            if not self.exampleDecrypt(url)['data']:
+                print('排行榜已经下载完毕')
+                break
+            for data in self.exampleDecrypt(url)['data']:
+                self.bookName = data['book_title']
+                bookid = str(data['book_id'])
+                print(self.bookName)
+                class_list_bookid.append(bookid)
+            print(class_list_bookid[-1])
+        return class_list_bookid
+            
+    def ranking(self):
+        ranking_list_bookid = []
+        for i in range(10000):
+            url = f'https://api.laomaoxs.com/novel/ranking?sex=2&page={i}&order=0'
+            if not self.exampleDecrypt(url)['data']:
+                print( '分类已经下载完毕')
+                break
+            for data in self.exampleDecrypt(url)['data']:
                 self.bookName = data['book_title']
                 print(self.bookName)
-                class_list_bookid.append(data['book_id'])
-            return class_list_bookid
+                ranking_list_bookid.append(data['book_id'])
+        return ranking_list_bookid
+            
             
     def ThreadPool(self, max_workers_number):
-        Thread_list = []
         """多线程并发实现"""
         with ThreadPoolExecutor(max_workers=max_workers_number) as t:
             for number, book_url in enumerate(self.chapters(True)):
                 new_thread = t.submit(self.ThreadPool_download, book_url, number)
-                Thread_list.append(new_thread)
         with open(os.path.join("Download", self.bookName + '.txt'), 'w') as f:
             self.filedir()
             print(f'\n小说 {self.bookName} 下载完成')
 
 
     
+    def Login(self, username, pwd):
+        url = 'https://api.laomaoxs.com/user/login'
+        login = self.post_requests(url, username, pwd)
+        login_info = example(decrypt(login))
+        if login_info['code'] == 1 and login_info['msg'] == 'ok':
+            user_id = login_info['data']['user_id'] # 用户id
+            nickname = login_info['data']['nickname']  # 用户名
+            user_account = login_info['data']['user_account']  # 登入账号
+            user_sex = login_info['data']['user_sex']  # 书架
+            user_token = login_info['data']['user_token']  # token
+            user_img = login_info['data']['user_img'] # 头像地址
+            print("{} login successfully!".format(nickname))
+            # self.headers['user_token'] = user_token
+            return user_token
+            # res = requests.get('https://api.laomaoxs.com/novel/lists?order=1&status=0&sex=2&page=1&type=0', headers=headers).text
+            # print(example(decrypt(res)))
+        else:
+            print('Login failed')
+        
