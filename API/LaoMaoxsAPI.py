@@ -1,3 +1,4 @@
+from ntpath import join
 import requests
 import os, re, sys
 import time, json
@@ -142,12 +143,9 @@ class Download():
                 content = self.exampleDecrypt(url)['data']
                 """跳过屏蔽章节"""
                 if "\\n\\n  编辑正在手打中，稍后点击右上角刷新当前章节！" not in content:
-                    content_chap_title = ""
-                    content_chap_title += f"\n\n\n{self.chapter_list[n]}\n\n"
-                    for content in content.split("\n"):
-                        content = re.sub(r'^\s*', "\n　　", content)
-                        if re.search(r'\S', content) != None:
-                            content_chap_title += content
+                    print(book_title)
+                    content = ''.join([re.sub(r'^\s*', "\n　　", content) for content in content.split("\n") if re.search(r'\S', content) != None])
+                    content_chap_title = f"\n\n{book_title}\n{content}"
                     self.write_txt(content_chap_title, book_title, n)
                 else:
                     print(f"{self.chapter_list[n]}这是屏蔽章节，跳过下载")
@@ -158,34 +156,25 @@ class Download():
     def ThreadPool_download(self, urls, number):
         """多线程下载函数"""
         content = self.exampleDecrypt(urls)['data']
+        book_title = self.chapter_list[number-1]
         # print(content)
         """跳过屏蔽章节"""
         if "\\n\\n  编辑正在手打中，稍后点击右上角刷新当前章节！" not in content:
-            book_title = self.chapter_list[number-1]
             print(book_title)
-            content_chap_title = ""
-            content_chap_title += f"\n\n\n{book_title}\n\n"
-            for content in content.split("\n"):
-                content = re.sub(r'^\s*', "\n　　", content)
-                if re.search(r'\S', content) != None:
-                    content_chap_title += content
+            content = ''.join([re.sub(r'^\s*', "\n　　", content) for content in content.split("\n") if re.search(r'\S', content) != None])
+            content_chap_title = f"\n\n{book_title}\n{content}"
             self.write_txt(content_chap_title, book_title, number)
         else:
-            print(f"{book_title}这是屏蔽章节，跳过下载")
+            print("{}这是屏蔽章节，跳过下载".format(book_title))
 
     def SearchBook(self, bookname):
-        search_book = []
-        for i in range(100):
-            url = f'https://api.laomaoxs.com/Search/index?key={bookname}&page={i}'
+        urls = ['https://api.laomaoxs.com/Search/index?key={}&page={}'.format(bookname, i) for i in range(100)]
+        for url in urls:
             if not self.exampleDecrypt(url)['data']:
-                break
-            for data in self.exampleDecrypt(url)['data']:
-                self.bookid = data['book_id']
-                self.book_hits = data['book_hits']  # 排行榜
-                self.bookName = data['book_title']
-                print(self.bookName)
-                search_book.append(data['book_id'])
-            return search_book
+                print('获取完毕'); break
+            """存储bookid进列表中"""
+            search_book = [data['book_id'] for data in self.exampleDecrypt(url)['data']]
+        return search_book
 
 
     def class_list(self, Tag_Number):
