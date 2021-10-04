@@ -2,11 +2,16 @@ from ntpath import join
 import requests
 import os, re, sys
 import time, json
+from .Settings import Set
 from .AesDecrypt import *
 from rich.progress import track
 from concurrent.futures import ThreadPoolExecutor
 
 
+Settings = Set()
+Settings.NewSettings()
+ReadSetting = Settings.ReadSettings()
+WriteSettings = Settings.WriteSettings
 class Download():
     def __init__(self):
         self.bookid = ''
@@ -33,18 +38,19 @@ class Download():
         else:
             return inp
 
-    def post_requests(self, user_name, user_pwd, url):
-        data = {'account': user_name, 'pwd': user_pwd}
+
+    def post_requests(self, url, data):
         response = requests.post(url,headers=self.headers, data=data).text
         return response
         
-    def get_requests(self, url):
-        response = requests.get(url,headers=self.headers).text
-        return response
-        
-        
     def exampleDecrypt(self, url):
-        return example(decrypt(self.get_requests(url)))
+        response = requests.get(url,headers=self.headers).text
+        return example(decrypt(response))
+        
+
+    def exampleDecryptpost(self, url, data):
+        return example(decrypt(self.post_requests(url, data)))
+        
         
     def filedir(self):
         meragefiledir = os.path.join(
@@ -217,22 +223,25 @@ class Download():
 
 
     
+
     def Login(self, username, pwd):
         url = 'https://api.laomaoxs.com/user/login'
-        login = self.post_requests(url, username, pwd)
-        login_info = example(decrypt(login))
-        if login_info['code'] == 1 and login_info['msg'] == 'ok':
-            user_id = login_info['data']['user_id'] # 用户id
-            nickname = login_info['data']['nickname']  # 用户名
-            user_account = login_info['data']['user_account']  # 登入账号
-            user_sex = login_info['data']['user_sex']  # 书架
-            user_token = login_info['data']['user_token']  # token
-            user_img = login_info['data']['user_img'] # 头像地址
+        data = {'account': username, 'pwd': pwd}
+        login_info, login_code, login_msg = (
+            self.exampleDecryptpost(url, data)['data'],
+            self.exampleDecryptpost(url, data)['code'],
+            self.exampleDecryptpost(url, data)['msg'])
+        if login_code == 1 and login_msg == 'ok':
+            user_id, nickname, user_account, user_sex, user_token, user_img = (
+                login_info['user_id'], str(login_info['nickname']),
+                login_info['user_account'], login_info['user_sex'],  
+                login_info['user_token'], login_info['user_img']) 
+            ReadSetting['nickname'] = nickname
+            ReadSetting['user_token'] = user_token
+            ReadSetting['user_id'] = user_id
+            WriteSettings(ReadSetting)
             print("{} login successfully!".format(nickname))
-            # self.headers['user_token'] = user_token
-            return user_token
-            # res = requests.get('https://api.laomaoxs.com/novel/lists?order=1&status=0&sex=2&page=1&type=0', headers=headers).text
-            # print(example(decrypt(res)))
-        else:
-            print('Login failed')
+            
+        elif login_code == 0 and login_msg == '账号或密码错误！':
+            print(msg)
         
