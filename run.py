@@ -29,7 +29,7 @@ def shell():
         except IndexError as e:
             username = Download.inputs(f'Error {e} input username:')
         try:
-            password = sys.argv[2]
+            password = sys.argv[3]
         except IndexError as e:
             password = Download.inputs(f'Error {e} input password:')
         search_book = Download.Login(username, password)
