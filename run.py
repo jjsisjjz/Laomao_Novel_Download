@@ -1,121 +1,118 @@
 import API.LaoMaoxsAPI
 import API.Settings
 import sys
-import os
+import getopt
 
 
-# 实例化类
-Download = API.LaoMaoxsAPI.Download()
-Setting = API.Settings.Set()
-
-
-
-def shell():
-    Setting.NewSettings()
-    Read = Setting.ReadSettings()
+def shell(argv):
+    ## 开始解析命令行参数
+    choice = 'h'
+    bookid = ''
+    bookname = ''
+    tag = ''
+    pool = True
+    usernames, passwords = None, None
     try:
-        Options = sys.argv[1]
-    except IndexError:
-        print(Read['help'])
-        quit("你没有输入任何命令")
+      opts, args = getopt.getopt(argv,"hkc:o:",[
+            "usernames=","passwords=","bookname=",
+            "bookid=","tag=","pool=","max="])
+    except getopt.GetoptError:
+        print('--max <max> pool number')
+        print('--bookid = <id>')
+        print('--bookname = <bookname>')
+        print('--pool  open Thread')
+        print('--usernames # Your Account usernames')
+        print('--passwords')
+        sys.exit(2)
+    for opt, arg in opts:
+        if opt == '-help':
+            print('--max <max> pool number')
+            print('--bookid = <id>')
+            print('--bookname = <bookname>')
+            print('--pool  open Thread')
+            print('--usernames # Your Account usernames')
+            print('--passwords')
+            sys.exit()
+        elif opt in ('--pool',):
+            pool = False
+        elif opt in ('--max',):
+            choice = 'settingmax'
+            max = arg
+        elif opt in ('--tagid',):
+            choice = 'gettag'
+            tag = arg
+        elif opt == ('--bookid',):
+            choice = 'bookid dwonload'
+            bookid = arg
+        elif opt in ('--bookname',):
+            choice = 'name dwonload'
+            bookname = arg
+        elif opt in ('--usernames',):
+            usernames = arg
+        elif opt in ('--passwords',):
+            passwords = arg
+        elif opt in ('--rank',):
+            choice = 'ranking'
+    
+    if usernames is not None and passwords is not None:
+        Download.Login(usernames, passwords)
         
-    if Options == '-h':
-        print(Read['help'])
-        quit("退出程序")
-        
-    if Options == '-l':
-        try:
-            username = sys.argv[2]
-        except IndexError as e:
-            username = Download.inputs(f'Error {e} input username:')
-        try:
-            password = sys.argv[3]
-        except IndexError as e:
-            password = Download.inputs(f'Error {e} input password:')
-        search_book = Download.Login(username, password)
-        
+    match choice:
+        case 'h':
+            print('--max <max> pool number')
+            print('--bookid = <id>')
+            print('--bookname = <bookname>')
+            print('--pool  open Thread')
+            print('--usernames # Your Account usernames')
+            print('--passwords')
 
-    elif Options == '-n' or Options == '--name':
-        try:
-            bookname = sys.argv[2]
-        except IndexError as e:
-            bookname = Download.inputs(f'Error {e} input bookname:')
-        try:
-            Open_ThreadPool = bool(sys.argv[3])
-        except IndexError:
-            Open_ThreadPool = Read['Open_ThreadPool']
-        search_book = Download.SearchBook(bookname)
-        for i in search_book:
-            Download.GetBook(i)
-            if Open_ThreadPool:
-                print("开启多线程")
-                Download.ThreadPool(Read['max_workers_number'])
-            else:
-                Download.chapters(Open_ThreadPool=False)
-            
-           
-    elif Options == '-b' or Options == '--bookid':
-        try:
-            bookid = sys.argv[2]
-        except IndexError as e:
-            bookid = Download.inputs(f'Error {e} input bookid:')
-        try:
-            Open_ThreadPool = sys.argv[3]
-        except IndexError:
-            print('默认以多线程方式下载')
-            Open_ThreadPool = Read['Open_ThreadPool']
-        finally:
-            Download.GetBook(bookid)
-            if Open_ThreadPool:
-                Download.ThreadPool(Read['max_workers_number'])
-            else:
-                Download.chapters(Open_ThreadPool=False)
-
-    elif Options == '-t':
-        try:
-            Tag_Number = sys.argv[2]
-        except IndexError as e:
-            Tag_Number = Download.inputs(f'Error {e} input Tag Number:')
-        try:
-            Open_ThreadPool = sys.argv[3]
-        except IndexError:
-            print('默认以多线程方式下载')
-            Open_ThreadPool = Read['Open_ThreadPool']
-        finally:
-            for i in Download.class_list(Tag_Number):
+        case 'name':
+            search_book = Download.SearchBook(bookname)
+            for i in search_book:
                 Download.GetBook(i)
-                if Open_ThreadPool:
+                if pool:
+                    print("开启多线程")
                     Download.ThreadPool(Read['max_workers_number'])
                 else:
-                    Download.chapters(Open_ThreadPool=False)
-                    
-    elif Options == '-r':
-        # try:
-            # Tag_Number = sys.argv[2]
-        # except IndexError as e:
-            # Tag_Number = Download.inputs(f'Error {e} input Tag Number:')
-        try:
-            Open_ThreadPool = sys.argv[3]
-        except IndexError:
-            print('默认以多线程方式下载')
-            Open_ThreadPool = Read['Open_ThreadPool']
-        finally:
+                    Download.chapters(pool=False)
+
+        case 'dwonloadbook':
+            Download.GetBook(bookid)
+            if pool:
+                Download.ThreadPool(Read['max_workers_number'])
+            else:
+                Download.chapters(pool=False)
+
+        case 'gettag':
+            for i in Download.class_list(tag):
+                Download.GetBook(i)
+                if pool:
+                    Download.ThreadPool(Read['max_workers_number'])
+                else:
+                    Download.chapters(pool=False)
+
+        case 'ranking':
             for i in Download.ranking():
                 Download.GetBook(i)
-                if Open_ThreadPool:
+                if pool:
                     Download.ThreadPool(Read['max_workers_number'])
                 else:
-                    Download.chapters(Open_ThreadPool=False)
-                    
-    elif Options == '-max':
-        max = sys.argv[2]
-        if max.isdigit():
-            Read['max_workers_number'] = 12 if int(max) > 12 else int(max)
-            print("线程已经设置为", Read['max_workers_number'])
-            Setting.WriteSettings(Read)
-        else:
-            print(max, "不是数字，请重新输入")
-    else:
-        print("选项为不存在,请输入-h获取帮助")
-            
-shell()
+                    Download.chapters(pool=False)
+
+        case 'settingmax':
+            if max.isdigit():
+                Read['max_workers_number'] = 12 if int(max) > 12 else int(max)
+                print("线程已经设置为", Read['max_workers_number'])
+                Setting.WriteSettings(Read)
+            else:
+                print(max, "不是数字，请重新输入")
+        case _:
+            print("选项为不存在,请输入-h获取帮助")
+
+
+if __name__ == '__main__':
+    Download = API.LaoMaoxsAPI.Download()
+    Setting = API.Settings.Set()
+    Setting.NewSettings()
+    Read = Setting.ReadSettings()
+    shell(sys.argv[1:])
